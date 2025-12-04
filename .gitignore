@@ -1,0 +1,19 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Checkpoint files (runtime)
+.checkpoint/
+
+# Output files
+*.csv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
