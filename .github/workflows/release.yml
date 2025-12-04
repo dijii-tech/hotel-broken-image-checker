@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: linux-x86_64
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: linux-x86_64-musl
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: linux-aarch64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: macos-x86_64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: macos-aarch64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Package
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czvf ../../../hotel-broken-image-checker-${{ matrix.name }}.tar.gz hotel-broken-image-checker
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hotel-broken-image-checker-${{ matrix.name }}
+          path: hotel-broken-image-checker-${{ matrix.name }}.tar.gz
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Hotel Broken Image Checker ${{ steps.version.outputs.VERSION }}
+
+            ### Downloads
+
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | Linux | x86_64 | `hotel-broken-image-checker-linux-x86_64.tar.gz` |
+            | Linux | x86_64 (static) | `hotel-broken-image-checker-linux-x86_64-musl.tar.gz` |
+            | Linux | ARM64 | `hotel-broken-image-checker-linux-aarch64.tar.gz` |
+            | macOS | Intel | `hotel-broken-image-checker-macos-x86_64.tar.gz` |
+            | macOS | Apple Silicon | `hotel-broken-image-checker-macos-aarch64.tar.gz` |
+
+            ### Installation
+
+            ```bash
+            # Download and extract
+            tar -xzf hotel-broken-image-checker-<platform>.tar.gz
+
+            # Make executable (if needed)
+            chmod +x hotel-broken-image-checker
+
+            # Move to PATH
+            sudo mv hotel-broken-image-checker /usr/local/bin/
+            ```
+          files: artifacts/**/*.tar.gz
+          draft: false
+          prerelease: false

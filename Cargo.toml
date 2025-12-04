@@ -1,9 +1,13 @@
 [package]
 name = "hotel-broken-image-checker"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "High-performance CLI tool to detect and clean broken image URLs from PostgreSQL databases"
 authors = ["Dijitech Team"]
+license = "MIT"
+repository = "https://github.com/dijii-tech/hotel-broken-image-checker"
+keywords = ["cli", "postgresql", "image", "checker", "database"]
+categories = ["command-line-utilities", "database"]
 
 [dependencies]
 tokio = { version = "1.48.0", features = ["full"] }
