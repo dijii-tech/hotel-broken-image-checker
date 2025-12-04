@@ -13,7 +13,15 @@ High-performance Rust CLI tool to detect and clean broken image URLs from Postgr
 
 ## Installation
 
-### Option 1: Download Pre-built Binary (Recommended)
+### Quick Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dijii-tech/hotel-broken-image-checker/main/install.sh | bash
+```
+
+This automatically detects your platform and installs the latest version.
+
+### Manual Download
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/dijii-tech/hotel-broken-image-checker/releases):
 
