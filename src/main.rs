@@ -80,11 +80,16 @@ async fn main() -> Result<()> {
         Checkpoint::new(&args.table, total_count, args.dry_run)
     };
 
-    // Create URL checker
-    let checker = UrlChecker::new(args.concurrency, args.timeout)?;
+    // Create URL checker with retry configuration
+    let checker = UrlChecker::new(
+        args.concurrency,
+        args.timeout,
+        args.retry_attempts,
+        args.retry_delay,
+    )?;
     info!(
-        "URL checker initialized with {} concurrent connections",
-        args.concurrency
+        "URL checker initialized with {} concurrent connections, {} retry attempts ({}s delay)",
+        args.concurrency, args.retry_attempts, args.retry_delay
     );
 
     // Setup progress bar
@@ -192,10 +197,28 @@ async fn main() -> Result<()> {
 
     // Delete broken URLs if requested
     if args.delete && !args.dry_run && !all_broken_ids.is_empty() {
-        info!("Deleting {} broken URL records...", all_broken_ids.len());
+        let backup = !args.no_backup;
+        if backup {
+            info!(
+                "Backing up and deleting {} broken URL records...",
+                all_broken_ids.len()
+            );
+        } else {
+            warn!(
+                "Deleting {} broken URL records WITHOUT backup...",
+                all_broken_ids.len()
+            );
+        }
 
-        let deleted = database.delete_by_ids(&all_broken_ids).await?;
+        let deleted = database.delete_by_ids(&all_broken_ids, backup).await?;
         info!("Successfully deleted {} records", deleted);
+
+        if backup {
+            info!(
+                "Backup stored in table: {}_deleted_backup",
+                args.table
+            );
+        }
 
         // Clean up checkpoint after successful deletion
         Checkpoint::delete().await?;

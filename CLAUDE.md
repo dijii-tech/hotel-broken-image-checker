@@ -65,10 +65,19 @@ cargo clippy
 - Uses `futures::stream::buffer_unordered` for concurrent requests
 - Configurable concurrency (default: 500)
 - HEAD request first, fallback to GET
+- 3-phase retry mechanism for temporary errors
+
+### Retry System
+- Phase 1: Normal concurrent check
+- Phase 2: Immediate retry for retryable errors
+- Phase 3: Delayed retry (configurable delay)
+- Non-retryable: 404, 400, 401, 403, 410, 451
+- Retryable: All other errors including timeouts
 
 ### Database Operations
 - Batch fetching with configurable batch size
 - Prepared statements for performance
+- Automatic backup before deletion (`{table}_deleted_backup`)
 - Transaction-based deletions
 
 ### Checkpoint System
@@ -112,6 +121,8 @@ cargo test -- --nocapture
 | Concurrency | `--concurrency` | 500 | HTTP workers |
 | Batch Size | `--batch-size` | 10000 | DB fetch size |
 | Timeout | `--timeout` | 10s | Per-request timeout |
+| Retry Attempts | `--retry-attempts` | 2 | Number of retries |
+| Retry Delay | `--retry-delay` | 10s | Phase 3 wait time |
 
 ## Troubleshooting
 
@@ -119,3 +130,5 @@ cargo test -- --nocapture
 - **Rate limiting (429)**: Reduce `--concurrency`
 - **Timeouts**: Increase `--timeout`
 - **Resume fails**: Check `.checkpoint/progress.json`
+- **False positives (503)**: Increase `--retry-attempts` and `--retry-delay`
+- **Restore deleted**: Query `{table}_deleted_backup` table

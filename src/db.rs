@@ -89,10 +89,88 @@ impl Database {
         Ok(results)
     }
 
-    /// Delete records by their IDs in batches
-    pub async fn delete_by_ids(&self, ids: &[i64]) -> Result<u64> {
+    /// Get the backup table name
+    fn get_backup_table_name(&self) -> String {
+        format!("{}_deleted_backup", self.table)
+    }
+
+    /// Create backup table if it doesn't exist (copies structure from original table)
+    pub async fn ensure_backup_table(&self) -> Result<()> {
+        let backup_table = self.get_backup_table_name();
+
+        // Create backup table with same structure + deleted_at timestamp
+        let query = format!(
+            r#"
+            CREATE TABLE IF NOT EXISTS {} (
+                LIKE {} INCLUDING ALL,
+                deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+            "#,
+            backup_table, self.table
+        );
+
+        sqlx::query(&query).execute(&self.pool).await?;
+
+        info!("Backup table '{}' ready", backup_table);
+        Ok(())
+    }
+
+    /// Backup records to backup table before deletion
+    async fn backup_records(&self, ids: &[i64]) -> Result<u64> {
         if ids.is_empty() {
             return Ok(0);
+        }
+
+        let backup_table = self.get_backup_table_name();
+        let mut total_backed_up: u64 = 0;
+
+        // Process in chunks of 1000
+        for chunk in ids.chunks(1000) {
+            // Get column names from original table (excluding deleted_at which is auto-added)
+            let columns_query = format!(
+                r#"
+                SELECT string_agg(column_name, ', ') as cols
+                FROM information_schema.columns
+                WHERE table_name = $1
+                AND column_name != 'deleted_at'
+                "#
+            );
+
+            let row = sqlx::query(&columns_query)
+                .bind(&self.table)
+                .fetch_one(&self.pool)
+                .await?;
+
+            let columns: String = row.get("cols");
+
+            // Insert into backup table
+            let insert_query = format!(
+                "INSERT INTO {} ({}) SELECT {} FROM {} WHERE {} = ANY($1) ON CONFLICT DO NOTHING",
+                backup_table, columns, columns, self.table, self.id_column
+            );
+
+            let result = sqlx::query(&insert_query)
+                .bind(chunk)
+                .execute(&self.pool)
+                .await?;
+
+            total_backed_up += result.rows_affected();
+        }
+
+        info!("Backed up {} records to '{}'", total_backed_up, backup_table);
+        Ok(total_backed_up)
+    }
+
+    /// Delete records by their IDs in batches (with optional backup)
+    pub async fn delete_by_ids(&self, ids: &[i64], backup: bool) -> Result<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
+        // Backup records first if requested
+        if backup {
+            self.ensure_backup_table().await?;
+            self.backup_records(ids).await?;
         }
 
         let mut total_deleted: u64 = 0;

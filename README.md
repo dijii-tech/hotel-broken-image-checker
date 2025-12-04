@@ -6,6 +6,8 @@ High-performance Rust CLI tool to detect and clean broken image URLs from Postgr
 
 - **High Performance**: 500+ concurrent HTTP requests using Tokio async runtime
 - **Memory Efficient**: Processes 17M+ records with ~200-500MB memory
+- **Smart Retry**: 3-phase retry mechanism for temporary errors (503, 502, 429, timeouts)
+- **Backup Before Delete**: Automatic backup to `{table}_deleted_backup` before deletion
 - **Resume Support**: Checkpoint system allows resuming interrupted operations
 - **Django Integration**: Automatically reads database credentials from `.env` file
 - **Flexible Output**: CSV export for analysis, direct database deletion
@@ -113,8 +115,11 @@ The binary will be at `./target/release/hotel-broken-image-checker`
 | `--concurrency` | Concurrent HTTP requests | `500` |
 | `--timeout` | HTTP timeout (seconds) | `10` |
 | `--batch-size` | Records per batch | `10000` |
+| `--retry-attempts` | Retry attempts for temporary errors | `2` |
+| `--retry-delay` | Delay between retries (seconds) | `10` |
 | `--dry-run` | Report only, no deletion | `false` |
 | `--delete` | Delete broken URLs | `false` |
+| `--no-backup` | Skip backup before deletion | `false` |
 | `--output` | CSV output file path | - |
 | `--resume` | Resume from checkpoint | `false` |
 | `-v, --verbose` | Verbose logging | `false` |
@@ -173,12 +178,54 @@ id,url,status_code,error
 67890,https://broken.com/img.png,,Connection failed
 ```
 
+## Retry Mechanism
+
+The tool uses a 3-phase retry system for temporary errors:
+
+1. **Phase 1**: Normal check - all URLs checked concurrently
+2. **Phase 2**: Immediate retry - failed URLs with retryable errors checked again
+3. **Phase 3**: Delayed retry - remaining failures checked after `--retry-delay` seconds
+
+**Retryable errors**: 502, 503, 429, 500, timeouts
+**Non-retryable errors**: 404, 400, 401, 403, 410 (permanent failures)
+
+## Backup System
+
+When using `--delete`, records are automatically backed up before deletion:
+
+```bash
+# Backup table is created automatically
+# Format: {original_table}_deleted_backup
+# Example: hotel_hotelproviderimage_deleted_backup
+```
+
+The backup table includes all original columns plus `deleted_at` timestamp.
+
+### Restore Deleted Records
+
+```sql
+-- Restore all deleted records
+INSERT INTO hotel_hotelproviderimage
+SELECT * FROM hotel_hotelproviderimage_deleted_backup;
+
+-- Restore specific records
+INSERT INTO hotel_hotelproviderimage
+SELECT * FROM hotel_hotelproviderimage_deleted_backup
+WHERE id IN (123, 456, 789);
+
+-- Restore records deleted after a date
+INSERT INTO hotel_hotelproviderimage
+SELECT * FROM hotel_hotelproviderimage_deleted_backup
+WHERE deleted_at > '2024-01-15';
+```
+
 ## Notes
 
 - Always run with `--dry-run` first to preview results
 - Some servers don't support HEAD requests; the tool falls back to GET
 - Rate limiting from providers may slow down checks (429 errors)
 - The checkpoint is deleted after successful `--delete` operation
+- Use `--no-backup` to skip backup (not recommended)
 
 ## License
 

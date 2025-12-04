@@ -50,6 +50,10 @@ pub struct Args {
     #[arg(long)]
     pub delete: bool,
 
+    /// Skip backup before deletion (not recommended)
+    #[arg(long)]
+    pub no_backup: bool,
+
     /// Output file for broken URLs report (CSV format)
     #[arg(long)]
     pub output: Option<String>,
@@ -61,6 +65,14 @@ pub struct Args {
     /// Verbose output
     #[arg(short, long)]
     pub verbose: bool,
+
+    /// Number of retry attempts for failed URLs (503, 429, 502 errors)
+    #[arg(long, default_value_t = 2)]
+    pub retry_attempts: u32,
+
+    /// Delay in seconds between retry attempts
+    #[arg(long, default_value_t = 10)]
+    pub retry_delay: u64,
 }
 
 impl Args {
