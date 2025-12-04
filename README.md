@@ -13,19 +13,47 @@ High-performance Rust CLI tool to detect and clean broken image URLs from Postgr
 
 ## Installation
 
-### Prerequisites
+### Option 1: Download Pre-built Binary (Recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/dijii-tech/hotel-broken-image-checker/releases):
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| Linux | x86_64 | `hotel-broken-image-checker-linux-x86_64.tar.gz` |
+| Linux | x86_64 (static) | `hotel-broken-image-checker-linux-x86_64-musl.tar.gz` |
+| Linux | ARM64 | `hotel-broken-image-checker-linux-aarch64.tar.gz` |
+| macOS | Intel | `hotel-broken-image-checker-macos-x86_64.tar.gz` |
+| macOS | Apple Silicon | `hotel-broken-image-checker-macos-aarch64.tar.gz` |
+
+```bash
+# Download and extract (example for Linux x86_64)
+wget https://github.com/dijii-tech/hotel-broken-image-checker/releases/latest/download/hotel-broken-image-checker-linux-x86_64.tar.gz
+tar -xzf hotel-broken-image-checker-linux-x86_64.tar.gz
+
+# Make executable and move to PATH
+chmod +x hotel-broken-image-checker
+sudo mv hotel-broken-image-checker /usr/local/bin/
+
+# Verify installation
+hotel-broken-image-checker --help
+```
+
+### Option 2: Build from Source
+
+#### Prerequisites
 
 - Rust 1.70+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL database access
 
-### Build
+#### Build
 
 ```bash
-cd tools/broken-image-checker
+git clone https://github.com/dijii-tech/hotel-broken-image-checker.git
+cd hotel-broken-image-checker
 cargo build --release
 ```
 
-The binary will be at `./target/release/broken-image-checker`
+The binary will be at `./target/release/hotel-broken-image-checker`
 
 ## Usage
 
